@@ -3,8 +3,11 @@
 package diout
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"github.com/ramory-l/easydi/internal/testdata/simple"
+	"github.com/ramory-l/easydi/lifecycle"
 )
 
 type Container struct {
@@ -27,4 +30,43 @@ func Build(config simple.Config, infra simple.Infra) (*Container, error) {
 
 func (c *Container) Exposed() []any {
 	return []any{c.NewService}
+}
+
+// Start starts every exposed lifecycle.Starter in dependency order. If a
+// Starter fails, Start closes every exposed lifecycle.Closer constructed
+// before it (in reverse order) and returns the error. After Start returns a
+// non-nil error the container is fully unwound: callers must NOT call Close.
+func (c *Container) Start(ctx context.Context) error {
+	nodes := c.Exposed()
+	for i, n := range nodes {
+		s, ok := n.(lifecycle.Starter)
+		if !ok {
+			continue
+		}
+		if err := s.Start(ctx); err != nil {
+			for j := i - 1; j >= 0; j-- {
+				if cl, ok := nodes[j].(lifecycle.Closer); ok {
+					_ = cl.Close(ctx)
+				}
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+// Close closes every exposed lifecycle.Closer in reverse dependency order and
+// returns the joined error of all failures. Do not call Close after Start has
+// returned a non-nil error (Start already unwound).
+func (c *Container) Close(ctx context.Context) error {
+	nodes := c.Exposed()
+	var errs []error
+	for i := len(nodes) - 1; i >= 0; i-- {
+		if cl, ok := nodes[i].(lifecycle.Closer); ok {
+			if err := cl.Close(ctx); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
