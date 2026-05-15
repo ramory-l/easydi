@@ -10,33 +10,48 @@ import (
 	"github.com/ramory-l/easydi/internal/scanner"
 )
 
+// Root is a di:root in the resolved graph, with the lowercased variable name
+// it will take as a parameter of the generated Build function.
 type Root struct {
 	Name    string // root type name (node name)
 	VarName string // generated Build parameter name (lowercased)
 	Type    types.Type
 }
 
+// Binding is how one provider parameter is satisfied: either by another
+// provider node (FromNode) or by a generated expression (Expr) such as a
+// root projection or a package-qualified literal.
 type Binding struct {
 	Param    scanner.Param
 	FromNode *Node  // non-nil when satisfied by another provider
 	Expr     string // generated expression (root projection / literal); "" when FromNode set
 }
 
+// Node is a provider together with the resolved bindings for its parameters.
 type Node struct {
 	Provider *scanner.Provider
 	Bindings []Binding
 }
 
+// Name returns the node's graph name (explicit di:provide name= or the
+// function name).
 func (n *Node) Name() string { return n.Provider.Name }
 
+// Graph is the resolved typed dependency graph: provider nodes plus the
+// di:root inputs.
 type Graph struct {
 	Nodes  []*Node
 	Roots  []*Root
 	byName map[string]*Node
 }
 
+// NodeByName returns the node with the given graph name, or nil.
 func (g *Graph) NodeByName(name string) *Node { return g.byName[name] }
 
+// Resolve builds the typed dependency graph from scanned providers and roots:
+// it resolves each provider parameter by di:param projection or by Go type
+// (strict pointer/value rules; interfaces via Implements), reporting missing
+// or ambiguous dependencies.
 func Resolve(r *scanner.Result) (*Graph, error) {
 	g := &Graph{byName: map[string]*Node{}}
 

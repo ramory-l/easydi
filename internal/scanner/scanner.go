@@ -14,12 +14,15 @@ import (
 	"github.com/ramory-l/easydi/internal/parampath"
 )
 
+// Param is a single constructor parameter of a di:provide function.
 type Param struct {
 	Name string
 	Type types.Type
 	Path *parampath.Path // nil = resolve by type
 }
 
+// Provider is a di:provide constructor function and the metadata needed to
+// turn it into a dependency-graph node.
 type Provider struct {
 	Pkg          *packages.Package
 	FuncName     string
@@ -30,16 +33,23 @@ type Provider struct {
 	Params       []Param
 }
 
+// Root is a di:root type: an external value supplied to the generated Build
+// function and projected from by di:param paths.
 type Root struct {
 	Name string
 	Type types.Type
 }
 
+// Result is the set of providers and roots discovered across all scanned
+// packages.
 type Result struct {
 	Providers []*Provider
 	Roots     []*Root
 }
 
+// Scan walks the syntax of the loaded packages and collects every di:root
+// type and di:provide function, mapping each di:param comment to its
+// parameter by source line.
 func Scan(pkgs []*packages.Package) (*Result, error) {
 	res := &Result{}
 	for _, p := range pkgs {
@@ -85,7 +95,10 @@ func indexComments(p *packages.Package, file *ast.File) map[int]annotation.Direc
 	return out
 }
 
-func docDirectives(p *packages.Package, doc *ast.CommentGroup) (provide bool, name string, root, expose bool, err error) {
+// docDirectives parses the di directives present in a declaration's doc
+// comment group, reporting whether it carries di:provide (and its name=),
+// di:root, or di:expose.
+func docDirectives(doc *ast.CommentGroup) (provide bool, name string, root, expose bool, err error) {
 	if doc == nil {
 		return
 	}
@@ -118,12 +131,12 @@ func scanRoots(p *packages.Package, d *ast.GenDecl, res *Result) error {
 			continue
 		}
 		// di:root may sit on the GenDecl doc (single spec) or the TypeSpec doc.
-		_, _, isRoot, _, err := docDirectives(p, d.Doc)
+		_, _, isRoot, _, err := docDirectives(d.Doc)
 		if err != nil {
 			return err
 		}
 		if !isRoot {
-			_, _, isRoot, _, err = docDirectives(p, ts.Doc)
+			_, _, isRoot, _, err = docDirectives(ts.Doc)
 			if err != nil {
 				return err
 			}
@@ -141,7 +154,7 @@ func scanRoots(p *packages.Package, d *ast.GenDecl, res *Result) error {
 }
 
 func scanProvider(p *packages.Package, fn *ast.FuncDecl, lineDir map[int]annotation.Directive, res *Result) error {
-	provide, name, _, expose, err := docDirectives(p, fn.Doc)
+	provide, name, _, expose, err := docDirectives(fn.Doc)
 	if err != nil {
 		return fmt.Errorf("%s: %w", fn.Name.Name, err)
 	}

@@ -8,12 +8,16 @@ import (
 	"github.com/ramory-l/easydi/internal/resolver"
 )
 
+// DFS visitation colors: white = unvisited, gray = on the current stack
+// (a back-edge to gray is a cycle), black = fully processed.
 const (
 	white = 0
 	gray  = 1
 	black = 2
 )
 
+// Sort returns the graph's nodes in dependency order (dependencies before
+// dependents) using a tri-color DFS, reporting an error if a cycle exists.
 func Sort(g *resolver.Graph) ([]*resolver.Node, error) {
 	color := map[*resolver.Node]int{}
 	var order []*resolver.Node

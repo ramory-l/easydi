@@ -9,11 +9,13 @@ import (
 	"strings"
 )
 
+// Seg is one dotted segment of a di:param path.
 type Seg struct {
 	Name string
 	Call bool // segment is a zero-arg method call, e.g. GetPostgresDB()
 }
 
+// Path is a parsed, validated di:param path: an ordered list of segments.
 type Path struct {
 	Segs []Seg
 }
@@ -34,6 +36,9 @@ func isIdent(s string) bool {
 	return true
 }
 
+// Parse parses and validates a di:param path string against the bounded
+// grammar. A single-segment path is the whole-root case; classifying a head
+// as a root versus a package-qualified literal is left to the resolver.
 func Parse(s string) (Path, error) {
 	if s == "" || s != strings.TrimSpace(s) {
 		return Path{}, fmt.Errorf("parampath: empty or padded path %q", s)

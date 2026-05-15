@@ -6,15 +6,18 @@ import (
 	"strings"
 )
 
+// Kind identifies which di directive a parsed line represents.
 type Kind int
 
+// The recognized di directive kinds.
 const (
-	Provide Kind = iota
-	Root
-	Param
-	Expose
+	Provide Kind = iota // di:provide [name=X]
+	Root                // di:root
+	Param               // di:param <path>
+	Expose              // di:expose
 )
 
+// Directive is a parsed di comment line.
 type Directive struct {
 	Kind Kind
 	Name string // for `di:provide name=X`

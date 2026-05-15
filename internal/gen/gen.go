@@ -50,6 +50,10 @@ func (it *importTracker) block() string {
 	return b.String()
 }
 
+// Generate emits the gofmt-formatted source of the easydi container for the
+// given resolved graph: a Container struct, a Build(<roots>) (*Container,
+// error) constructor with providers in topological order, and an Exposed()
+// accessor for di:expose nodes. pkgName sets the package clause.
 func Generate(g *resolver.Graph, order []*resolver.Node, pkgName string) ([]byte, error) {
 	it := newImportTracker()
 	q := it.qualifier

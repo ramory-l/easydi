@@ -16,6 +16,8 @@ const mode = packages.NeedName |
 	packages.NeedSyntax |
 	packages.NeedTypesInfo
 
+// Load loads the packages matching patterns with full type and syntax
+// information, returning a joined error if any loaded package has errors.
 func Load(patterns ...string) ([]*packages.Package, error) {
 	pkgs, err := packages.Load(&packages.Config{Mode: mode}, patterns...)
 	if err != nil {
