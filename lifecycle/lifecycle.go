@@ -1,5 +1,5 @@
 // Package lifecycle defines the optional Start/Close interfaces that easydi's
-// generated Container honors over di:expose nodes.
+// generated Container calls on di:expose nodes.
 //
 // A node included in Container.Exposed() may implement Starter and/or Closer.
 // Container.Start calls Start in topological (dependency-first) order;
