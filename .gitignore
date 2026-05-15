@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Internal specs/plans — kept in-repo, not committed
+docs/superpowers/
