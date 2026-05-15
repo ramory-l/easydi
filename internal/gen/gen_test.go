@@ -2,6 +2,7 @@ package gen
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/ramory-l/easydi/internal/loader"
@@ -38,5 +39,44 @@ func TestGenerateGolden(t *testing.T) {
 	}
 	if string(out) != string(want) {
 		t.Fatalf("generated output mismatch.\n--- got ---\n%s", out)
+	}
+}
+
+func TestGenerateEmitsLifecycle(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/simple")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res, err := scanner.Scan(pkgs)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	g, err := resolver.Resolve(res)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	order, err := topo.Sort(g)
+	if err != nil {
+		t.Fatalf("sort: %v", err)
+	}
+	out, err := Generate(g, order, "diout")
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	s := string(out)
+	for _, want := range []string{
+		`"context"`,
+		`"errors"`,
+		`"github.com/ramory-l/easydi/lifecycle"`,
+		"func (c *Container) Start(ctx context.Context) error {",
+		"func (c *Container) Close(ctx context.Context) error {",
+		"nodes := c.Exposed()",
+		"n.(lifecycle.Starter)",
+		"nodes[i].(lifecycle.Closer)",
+		"return errors.Join(errs...)",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("generated output missing %q\n---\n%s", want, s)
+		}
 	}
 }
