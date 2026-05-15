@@ -2,6 +2,7 @@
 package loader
 
 import (
+	"errors"
 	"fmt"
 
 	"golang.org/x/tools/go/packages"
@@ -20,15 +21,14 @@ func Load(patterns ...string) ([]*packages.Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
 	}
-	var errs int
+	var errs []error
 	packages.Visit(pkgs, nil, func(p *packages.Package) {
-		errs += len(p.Errors)
 		for _, e := range p.Errors {
-			err = fmt.Errorf("%s: %s", p.PkgPath, e)
+			errs = append(errs, fmt.Errorf("%s: %s", p.PkgPath, e))
 		}
 	})
-	if errs > 0 {
-		return nil, fmt.Errorf("packages had %d errors: %w", errs, err)
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("packages had %d errors: %w", len(errs), errors.Join(errs...))
 	}
 	return pkgs, nil
 }

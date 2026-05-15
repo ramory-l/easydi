@@ -2,6 +2,7 @@
 package scanner
 
 import (
+	"cmp"
 	"fmt"
 	"go/ast"
 	"go/types"
@@ -161,7 +162,7 @@ func scanProvider(p *packages.Package, fn *ast.FuncDecl, lineDir map[int]annotat
 	prov := &Provider{
 		Pkg:          p,
 		FuncName:     fn.Name.Name,
-		Name:         orElse(name, fn.Name.Name),
+		Name:         cmp.Or(name, fn.Name.Name),
 		Produces:     produces,
 		ReturnsError: returnsErr,
 		Expose:       expose,
@@ -212,11 +213,4 @@ func producedType(fnName string, sig *types.Signature) (types.Type, bool, error)
 	default:
 		return nil, false, fmt.Errorf("provider %s must return (T) or (T, error)", fnName)
 	}
-}
-
-func orElse(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
 }
