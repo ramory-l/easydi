@@ -74,6 +74,8 @@ func TestGenerateEmitsLifecycle(t *testing.T) {
 		"n.(lifecycle.Starter)",
 		"nodes[i].(lifecycle.Closer)",
 		"return errors.Join(errs...)",
+		"for j := i - 1; j >= 0; j--",
+		"_ = cl.Close(ctx)",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("generated output missing %q\n---\n%s", want, s)

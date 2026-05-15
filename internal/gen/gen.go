@@ -52,8 +52,9 @@ func (it *importTracker) block() string {
 
 // Generate emits the gofmt-formatted source of the easydi container for the
 // given resolved graph: a Container struct, a Build(<roots>) (*Container,
-// error) constructor with providers in topological order, and an Exposed()
-// accessor for di:expose nodes. pkgName sets the package clause.
+// error) constructor with providers in topological order, an Exposed()
+// accessor for di:expose nodes, and Start/Close lifecycle methods over the
+// exposed nodes. pkgName sets the package clause.
 func Generate(g *resolver.Graph, order []*resolver.Node, pkgName string) ([]byte, error) {
 	it := newImportTracker()
 	q := it.qualifier
@@ -114,11 +115,12 @@ func Generate(g *resolver.Graph, order []*resolver.Node, pkgName string) ([]byte
 	}
 	body.WriteString("}\n")
 
-	// Lifecycle: Start/Close over exposed nodes. Start runs in dependency
-	// order and rolls back already-passed Closers on failure; Close runs in
-	// reverse order and joins all errors. Always emitted; nodes that
-	// implement neither interface are skipped at runtime.
+	// Lifecycle: emit Start/Close over exposed nodes (see emitted doc comments).
 	body.WriteString(`
+// Start starts every exposed lifecycle.Starter in dependency order. If a
+// Starter fails, Start closes every exposed lifecycle.Closer constructed
+// before it (in reverse order) and returns the error. After Start returns a
+// non-nil error the container is fully unwound: callers must NOT call Close.
 func (c *Container) Start(ctx context.Context) error {
 	nodes := c.Exposed()
 	for i, n := range nodes {
@@ -138,6 +140,9 @@ func (c *Container) Start(ctx context.Context) error {
 	return nil
 }
 
+// Close closes every exposed lifecycle.Closer in reverse dependency order and
+// returns the joined error of all failures. Do not call Close after Start has
+// returned a non-nil error (Start already unwound).
 func (c *Container) Close(ctx context.Context) error {
 	nodes := c.Exposed()
 	var errs []error
