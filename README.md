@@ -392,6 +392,81 @@ func New( /* ... */ ) *DB { ... }   // -> c.ReplicaDB
 > value from a root with `// di:param`. (Per-parameter provider selection is
 > a planned future addition.)
 
+## Lifecycle: Start and Close
+
+`Build` only *constructs* your graph. Real services also have components that
+must be **started** (background workers, queue consumers, schedulers) and
+**stopped cleanly** on shutdown (flush buffers, close pools and clients).
+
+Without help, the only thing that knows "which of these constructed objects
+must run, and in what order" is a hand-written aggregator — exactly the glue
+DI is meant to remove. The Lifecycle feature closes that gap: a node declares
+its own runtime needs by implementing an interface, and the generated
+container drives them in dependency order. No aggregator, no registry.
+
+### The interfaces
+
+`easydi` exposes one tiny, framework-agnostic package:
+
+```go
+import "github.com/ramory-l/easydi/lifecycle"
+
+type Starter interface{ Start(ctx context.Context) error }
+type Closer  interface{ Close(ctx context.Context) error }
+```
+
+Both are optional. Any node included in `Exposed()` (i.e. annotated
+`// di:expose`) that implements `Starter` and/or `Closer` is driven
+automatically; nodes that implement neither are skipped.
+
+### Generated behavior
+
+Over the exposed nodes, in **topological (dependency-first) order**, `easydi`
+emits:
+
+```go
+func (c *Container) Start(ctx context.Context) error
+func (c *Container) Close(ctx context.Context) error
+```
+
+- `Start` calls `Start(ctx)` on each exposed `Starter` in dependency order.
+  If one fails, every exposed `Closer` constructed *before* it is closed in
+  reverse order and the original error is returned. **After `Start` returns a
+  non-nil error the container is fully unwound — do not call `Close`.**
+- `Close` calls `Close(ctx)` on each exposed `Closer` in **reverse**
+  dependency order and returns `errors.Join` of all failures.
+
+The ordering guarantee is the same one `Build` already uses: dependencies are
+started before their dependents and closed after them.
+
+### Example
+
+```go
+// di:provide
+// di:expose
+func NewWorker(q Queue) *Worker { return &Worker{q: q} }
+
+func (w *Worker) Start(ctx context.Context) error { go w.loop(ctx); return nil }
+func (w *Worker) Close(ctx context.Context) error { return w.drain(ctx) }
+```
+
+```go
+func main() {
+	c, err := di.Build(cfg, infra)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ctx := context.Background()
+	if err := c.Start(ctx); err != nil {
+		log.Fatal(err) // already unwound; do NOT call Close here
+	}
+	defer c.Close(ctx)
+
+	// ... serve ...
+}
+```
+
 ## Generated API
 
 For scanned packages, `easydi` emits exactly:
@@ -402,6 +477,8 @@ type Container struct { /* one field per node, named by node name, in dep order 
 func Build(<one param per di:root, lowercased type name>) (*Container, error)
 
 func (c *Container) Exposed() []any // di:expose nodes, in dep order; nil if none
+func (c *Container) Start(ctx context.Context) error // di:expose Starters, dep order; unwinds & returns on first failure
+func (c *Container) Close(ctx context.Context) error // di:expose Closers, reverse order; errors.Join of failures
 ```
 
 `Build` constructs every node once, in topological order, threading
