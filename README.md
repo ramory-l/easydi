@@ -512,7 +512,7 @@ plain Go.
   same Go module.
 - `-pkg` is required; `-o` defaults to `./easydi_gen.go`.
 
-## Limitations (v0.1.0)
+## Limitations (v0.2.0)
 
 - No per-parameter provider selection when multiple providers share a type
   (see the `name=` note above).
