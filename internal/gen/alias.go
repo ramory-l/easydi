@@ -3,6 +3,7 @@ package gen
 import (
 	"go/token"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -41,11 +42,16 @@ func computeAliases(paths []string, pkgName map[string]string) map[string]string
 		// Collision group: find the minimum k such that all members produce
 		// distinct identifiers at suffix depth k, then assign.
 		segsPerMember := make([][]string, len(members))
+		maxDepth := 0
 		for i, p := range members {
 			segsPerMember[i] = strings.Split(p, "/")
+			if l := len(segsPerMember[i]); l > maxDepth {
+				maxDepth = l
+			}
 		}
 		assigned := make([]string, len(members))
-		for k := 1; ; k++ {
+		suffixResolved := false
+		for k := 1; k <= maxDepth; k++ {
 			cands := make([]string, len(members))
 			ok := true
 			seen := map[string]bool{}
@@ -64,8 +70,20 @@ func computeAliases(paths []string, pkgName map[string]string) map[string]string
 			}
 			if ok {
 				copy(assigned, cands)
+				suffixResolved = true
 				break
 			}
+		}
+		// If suffix loop exhausted maxDepth without distinguishing all members
+		// (e.g. every segment sanitizes to ""), fall back to uniqueSuffixAlias
+		// for each member individually (which has a numeric termination guarantee).
+		if !suffixResolved {
+			for _, p := range members {
+				a := uniqueSuffixAlias(p, used)
+				alias[p] = a
+				used[a] = true
+			}
+			continue
 		}
 		// Now assign, resolving any collision with previously used aliases by
 		// extending the suffix further for affected members.
@@ -100,7 +118,7 @@ func uniqueSuffixAlias(path string, used map[string]bool) string {
 	}
 	base := segmentsToIdent(segs)
 	for i := 2; ; i++ {
-		cand := base + "_" + itoa(i)
+		cand := base + "_" + strconv.Itoa(i)
 		if !used[cand] && !token.IsKeyword(cand) {
 			return cand
 		}
@@ -167,16 +185,4 @@ func sanitize(s string) string {
 		}
 	}
 	return b.String()
-}
-
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	var d []byte
-	for i > 0 {
-		d = append([]byte{byte('0' + i%10)}, d...)
-		i /= 10
-	}
-	return string(d)
 }
