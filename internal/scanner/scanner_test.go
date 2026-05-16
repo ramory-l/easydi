@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ramory-l/easydi/internal/loader"
@@ -49,5 +50,62 @@ func TestScan(t *testing.T) {
 	h := byName["NewHasher"]
 	if h.Params[0].Path == nil || h.Params[0].Path.String() != "Infra.DB.DSN()" {
 		t.Fatalf("NewHasher dsn path=%+v", h.Params[0].Path)
+	}
+}
+
+// TestScanDiUse verifies that a // di:use <NodeName> comment directly above a
+// parameter is scanned into Param.Use and that Param.Path remains nil.
+func TestScanDiUse(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/diuseok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Scan(pkgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	byName := map[string]*Provider{}
+	for _, p := range res.Providers {
+		byName[p.Name] = p
+	}
+
+	w := byName["W"]
+	if w == nil {
+		t.Fatalf("provider W not found; got names: %v", func() []string {
+			var ns []string
+			for n := range byName {
+				ns = append(ns, n)
+			}
+			return ns
+		}())
+	}
+	if len(w.Params) != 1 {
+		t.Fatalf("W.Params count=%d want 1", len(w.Params))
+	}
+	param := w.Params[0]
+	if param.Use != "UserService" {
+		t.Fatalf("W.Params[0].Use=%q want %q", param.Use, "UserService")
+	}
+	if param.Path != nil {
+		t.Fatalf("W.Params[0].Path should be nil, got %+v", param.Path)
+	}
+}
+
+// TestScanDiUseParamConflict verifies that a parameter with both // di:param
+// and // di:use stacked directly above it causes Scan to return a
+// mutual-exclusion error.
+func TestScanDiUseParamConflict(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/diuse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Scan(pkgs)
+	if err == nil {
+		t.Fatal("expected error for di:param + di:use conflict, got nil")
+	}
+	const want = "di:param and di:use are mutually exclusive"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error %q does not contain %q", err.Error(), want)
 	}
 }

@@ -19,6 +19,7 @@ type Param struct {
 	Name string
 	Type types.Type
 	Path *parampath.Path // nil = resolve by type
+	Use  string          // di:use node name; "" = none
 }
 
 // Provider is a di:provide constructor function and the metadata needed to
@@ -183,14 +184,38 @@ func scanProvider(p *packages.Package, fn *ast.FuncDecl, lineDir map[int]annotat
 
 	for _, field := range fn.Type.Params.List {
 		var pth *parampath.Path
+		var use string
 		line := p.Fset.Position(field.Pos()).Line
-		if d, ok := lineDir[line-1]; ok && d.Kind == annotation.Param {
-			parsed, perr := parampath.Parse(d.Path)
-			if perr != nil {
-				return fmt.Errorf("%s: %w", fn.Name.Name, perr)
-			}
-			pth = &parsed
+
+		d1, ok1 := lineDir[line-1]
+		d2, ok2 := lineDir[line-2]
+
+		// Detect mutual exclusion: di:param and di:use stacked above the param.
+		kinds := map[annotation.Kind]bool{}
+		if ok1 {
+			kinds[d1.Kind] = true
 		}
+		if ok2 {
+			kinds[d2.Kind] = true
+		}
+		if kinds[annotation.Param] && kinds[annotation.Use] {
+			return fmt.Errorf("%s: parameter on line %d: di:param and di:use are mutually exclusive", fn.Name.Name, line)
+		}
+
+		// Apply the directive on the line immediately above the param.
+		if ok1 {
+			switch d1.Kind {
+			case annotation.Param:
+				parsed, perr := parampath.Parse(d1.Path)
+				if perr != nil {
+					return fmt.Errorf("%s: %w", fn.Name.Name, perr)
+				}
+				pth = &parsed
+			case annotation.Use:
+				use = d1.Node
+			}
+		}
+
 		// One field may declare multiple names sharing a type.
 		names := field.Names
 		if len(names) == 0 {
@@ -201,7 +226,7 @@ func scanProvider(p *packages.Package, fn *ast.FuncDecl, lineDir map[int]annotat
 			if ft == nil {
 				return fmt.Errorf("%s: param %s has no type", fn.Name.Name, nm.Name)
 			}
-			prov.Params = append(prov.Params, Param{Name: nm.Name, Type: ft, Path: pth})
+			prov.Params = append(prov.Params, Param{Name: nm.Name, Type: ft, Path: pth, Use: use})
 		}
 	}
 
