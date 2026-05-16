@@ -538,6 +538,7 @@ collision-safe, deterministic identifier:
   Go identifier that is not a keyword, it is kept bare (e.g. `app`, `http`).
 - Otherwise a minimal-unique-suffix lowerCamelCase alias is derived from the
   import path (e.g. two packages both named `http` might become `twitchHttp`
+  and `vkliveHttp`; two packages both named `auth` might become `internalAuth`
   and `handlersAuth`; a package named `type` gets an alias because it is a
   keyword).
 
