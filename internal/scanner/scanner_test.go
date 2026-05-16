@@ -109,3 +109,18 @@ func TestScanDiUseParamConflict(t *testing.T) {
 		t.Fatalf("error %q does not contain %q", err.Error(), want)
 	}
 }
+
+func TestScanDiUseParamConflictReverseOrder(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/diuserev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Scan(pkgs)
+	if err == nil {
+		t.Fatal("expected error for di:use + di:param conflict (reverse order), got nil")
+	}
+	const want = "di:param and di:use are mutually exclusive"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error %q does not contain %q", err.Error(), want)
+	}
+}

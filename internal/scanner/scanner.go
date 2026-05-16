@@ -191,14 +191,9 @@ func scanProvider(p *packages.Package, fn *ast.FuncDecl, lineDir map[int]annotat
 		d2, ok2 := lineDir[line-2]
 
 		// Detect mutual exclusion: di:param and di:use stacked above the param.
-		kinds := map[annotation.Kind]bool{}
-		if ok1 {
-			kinds[d1.Kind] = true
-		}
-		if ok2 {
-			kinds[d2.Kind] = true
-		}
-		if kinds[annotation.Param] && kinds[annotation.Use] {
+		hasParam := (ok1 && d1.Kind == annotation.Param) || (ok2 && d2.Kind == annotation.Param)
+		hasUse := (ok1 && d1.Kind == annotation.Use) || (ok2 && d2.Kind == annotation.Use)
+		if hasParam && hasUse {
 			return fmt.Errorf("%s: parameter on line %d: di:param and di:use are mutually exclusive", fn.Name.Name, line)
 		}
 
