@@ -1,6 +1,17 @@
-# easydi
+<div align="center">
+
+<img src="assets/logo.svg#gh-dark-mode-only" alt="easydi" height="72">
+<img src="assets/logo-light.svg#gh-light-mode-only" alt="easydi" height="72">
 
 Reflection-free, compile-time dependency-injection code generator for Go.
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/ramory-l/easydi.svg)](https://pkg.go.dev/github.com/ramory-l/easydi)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ramory-l/easydi)](https://goreportcard.com/report/github.com/ramory-l/easydi)
+[![CI](https://github.com/ramory-l/easydi/actions/workflows/ci.yml/badge.svg)](https://github.com/ramory-l/easydi/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ramory-l/easydi?sort=semver)](https://github.com/ramory-l/easydi/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+</div>
 
 `easydi` reads `// di:` comment annotations on your constructors and root
 types and generates a plain Go file containing a `Container` struct and a
