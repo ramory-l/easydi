@@ -35,3 +35,20 @@ func TestParseErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestParseDiUse(t *testing.T) {
+	d, ok, err := Parse("di:use UserService")
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	if d.Kind != Use || d.Node != "UserService" {
+		t.Fatalf("got %+v", d)
+	}
+
+	if _, _, err := Parse("di:use"); err == nil {
+		t.Fatalf("di:use with no node must error")
+	}
+	if _, _, err := Parse("di:use A B"); err == nil {
+		t.Fatalf("di:use with two args must error")
+	}
+}

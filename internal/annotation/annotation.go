@@ -15,6 +15,7 @@ const (
 	Root                // di:root
 	Param               // di:param <path>
 	Expose              // di:expose
+	Use                 // di:use <NodeName>
 )
 
 // Directive is a parsed di comment line.
@@ -22,6 +23,7 @@ type Directive struct {
 	Kind Kind
 	Name string // for `di:provide name=X`
 	Path string // for `di:param <path>`
+	Node string // for `di:use <NodeName>`
 }
 
 // Parse parses the text of a single comment line (already stripped of the
@@ -69,6 +71,11 @@ func Parse(text string) (Directive, bool, error) {
 			return Directive{}, true, fmt.Errorf("di:expose: takes no args")
 		}
 		return Directive{Kind: Expose}, true, nil
+	case "use":
+		if len(fields) != 2 {
+			return Directive{}, true, fmt.Errorf("di:use: expects exactly one node name")
+		}
+		return Directive{Kind: Use, Node: fields[1]}, true, nil
 	default:
 		return Directive{}, false, nil
 	}
