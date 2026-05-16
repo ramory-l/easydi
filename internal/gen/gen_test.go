@@ -1,6 +1,7 @@
 package gen
 
 import (
+	"go/format"
 	"os"
 	"strings"
 	"testing"
@@ -80,5 +81,50 @@ func TestGenerateEmitsLifecycle(t *testing.T) {
 		if !strings.Contains(s, want) {
 			t.Fatalf("generated output missing %q\n---\n%s", want, s)
 		}
+	}
+}
+
+func TestGenerateDedupesCollidingImports(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/collide/...")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res, err := scanner.Scan(pkgs)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	g, err := resolver.Resolve(res)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	order, err := topo.Sort(g)
+	if err != nil {
+		t.Fatalf("sort: %v", err)
+	}
+	out, err := Generate(g, order, "diout")
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	s := string(out)
+	// Two packages named "svc" must NOT both be imported as bare "svc".
+	// computeAliases produces lowerCamelCase suffix-based aliases (e.g. aSvc,
+	// bSvc) so we check that at least one import line carries an explicit alias
+	// for one of the collide/*/svc paths.
+	if strings.Count(s, `"github.com/ramory-l/easydi/internal/testdata/collide/`) < 2 {
+		t.Fatalf("expected both collide svc imports present, got:\n%s", s)
+	}
+	if strings.Contains(s, "\t\"github.com/ramory-l/easydi/internal/testdata/collide/a/svc\"") &&
+		strings.Contains(s, "\t\"github.com/ramory-l/easydi/internal/testdata/collide/b/svc\"") {
+		// Both imported as bare "svc" — collision not resolved.
+		t.Fatalf("both svc packages imported without alias (collision not resolved):\n%s", s)
+	}
+	// The generated file must be valid Go (parses + gofmt-stable).
+	if _, ferr := format.Source(out); ferr != nil {
+		t.Fatalf("generated source not valid Go: %v\n%s", ferr, s)
+	}
+	// Determinism: regenerate, expect identical bytes.
+	out2, _ := Generate(g, order, "diout")
+	if string(out2) != s {
+		t.Fatalf("generation not deterministic")
 	}
 }
