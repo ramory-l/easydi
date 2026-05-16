@@ -170,3 +170,53 @@ func TestGenerateDedupesCollidingImports(t *testing.T) {
 		t.Fatalf("generation not deterministic")
 	}
 }
+
+func TestGenerateV3EndToEndCompiles(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/v3e2e/...")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res, err := scanner.Scan(pkgs)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	g, err := resolver.Resolve(res)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	order, err := topo.Sort(g)
+	if err != nil {
+		t.Fatalf("sort: %v", err)
+	}
+	out, err := Generate(g, order, "di")
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	s := string(out)
+
+	// Feature B: no self-import of the output di package.
+	if strings.Contains(s, `testdata/v3e2e/di"`) {
+		t.Fatalf("self-import present:\n%s", s)
+	}
+	// Feature B: Build must take the alias RHS *cfg.Config, not the alias name di.Config.
+	if !strings.Contains(s, "func Build(config *cfg.Config)") {
+		t.Fatalf("alias root RHS missing from Build signature:\n%s", s)
+	}
+	// Feature C: di:use Svc must wire c.Svc into NewWidget, not c.Repo.
+	// We check the Widget call expression directly rather than fragile suffix
+	// matching that could fire on NewSvc's argument list.
+	if !strings.Contains(s, "NewWidget(c.Svc)") {
+		t.Fatalf("di:use must bind Svc: expected NewWidget(c.Svc) in output:\n%s", s)
+	}
+	if strings.Contains(s, "NewWidget(c.Repo)") {
+		t.Fatalf("di:use must NOT bind Repo: found NewWidget(c.Repo) in output:\n%s", s)
+	}
+	// Feature A: two packages named "store" must be aliased (no bare collision).
+	if !strings.Contains(s, "aStore.") || !strings.Contains(s, "bStore.") {
+		t.Fatalf("expected aliased store qualifiers (aStore./bStore.) in output:\n%s", s)
+	}
+	// Output must be valid gofmt'd Go.
+	if _, ferr := format.Source(out); ferr != nil {
+		t.Fatalf("generated invalid Go: %v\n%s", ferr, s)
+	}
+}
