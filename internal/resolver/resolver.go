@@ -89,6 +89,17 @@ func Resolve(r *scanner.Result) (*Graph, error) {
 }
 
 func resolveParam(g *Graph, roots map[string]*Root, n *Node, param scanner.Param) (Binding, error) {
+	if param.Use != "" {
+		target := g.byName[param.Use]
+		if target == nil {
+			return Binding{}, fmt.Errorf("di:use %s: no provider node named %s", param.Use, param.Use)
+		}
+		if !satisfies(target.Provider.Produces, param.Type) {
+			return Binding{}, fmt.Errorf("di:use %s: node %s (%s) not assignable to parameter %s (%s)",
+				param.Use, param.Use, target.Provider.Produces, param.Name, param.Type)
+		}
+		return Binding{Param: param, FromNode: target}, nil
+	}
 	if param.Path != nil {
 		return resolvePath(roots, param)
 	}

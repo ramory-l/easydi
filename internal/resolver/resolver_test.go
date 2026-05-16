@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"go/types"
+	"strings"
 	"testing"
 
 	"github.com/ramory-l/easydi/internal/loader"
@@ -77,6 +78,78 @@ func TestSatisfiesStrict(t *testing.T) {
 	}
 	if !satisfies(intT, intT) {
 		t.Fatal("int must satisfy int")
+	}
+}
+
+// TestDiUseHappy verifies that di:use selects the named node when two providers
+// both satisfy the parameter interface (which would otherwise be ambiguous).
+func TestDiUseHappy(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/diuseambig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Scan(pkgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := Resolve(res)
+	if err != nil {
+		t.Fatalf("Resolve returned error (expected success): %v", err)
+	}
+	consumer := g.NodeByName("Consumer")
+	if consumer == nil {
+		t.Fatal("Consumer node missing")
+	}
+	if len(consumer.Bindings) == 0 {
+		t.Fatal("Consumer has no bindings")
+	}
+	b := consumer.Bindings[0]
+	if b.FromNode == nil {
+		t.Fatalf("binding[0].FromNode is nil, got Expr=%q", b.Expr)
+	}
+	if got := b.FromNode.Name(); got != "UserService" {
+		t.Fatalf("binding[0].FromNode.Name()=%q, want UserService", got)
+	}
+}
+
+// TestDiUseUnknownNode verifies that di:use with a non-existent node name
+// returns an error containing "no provider node named".
+func TestDiUseUnknownNode(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/diusenone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Scan(pkgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Resolve(res)
+	if err == nil {
+		t.Fatal("expected error for unknown di:use node, got nil")
+	}
+	if !strings.Contains(err.Error(), "no provider node named") {
+		t.Fatalf("error %q does not contain \"no provider node named\"", err.Error())
+	}
+}
+
+// TestDiUseNotAssignable verifies that di:use with a node whose produced type
+// is not assignable to the parameter type returns an error containing
+// "not assignable to parameter".
+func TestDiUseNotAssignable(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/diusebad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := scanner.Scan(pkgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Resolve(res)
+	if err == nil {
+		t.Fatal("expected error for not-assignable di:use, got nil")
+	}
+	if !strings.Contains(err.Error(), "not assignable to parameter") {
+		t.Fatalf("error %q does not contain \"not assignable to parameter\"", err.Error())
 	}
 }
 
