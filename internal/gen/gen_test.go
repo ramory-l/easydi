@@ -122,8 +122,15 @@ func TestGenerateDedupesCollidingImports(t *testing.T) {
 	if _, ferr := format.Source(out); ferr != nil {
 		t.Fatalf("generated source not valid Go: %v\n%s", ferr, s)
 	}
+	// The body must use the aliased qualifiers, not a bare ambiguous "svc.".
+	if !strings.Contains(s, "aSvc.") || !strings.Contains(s, "bSvc.") {
+		t.Fatalf("expected aliased qualifiers (aSvc./bSvc.) in body, got:\n%s", s)
+	}
 	// Determinism: regenerate, expect identical bytes.
-	out2, _ := Generate(g, order, "diout")
+	out2, err := Generate(g, order, "diout")
+	if err != nil {
+		t.Fatalf("regenerate: %v", err)
+	}
 	if string(out2) != s {
 		t.Fatalf("generation not deterministic")
 	}
