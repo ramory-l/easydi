@@ -196,6 +196,7 @@ Then `go generate ./...` regenerates the container as part of your build.
 | `// di:provide name=X` | constructor func doc | same, with an explicit node name `X` |
 | `// di:root` | type declaration doc | declare an external input to `Build` |
 | `// di:param <path>` | line directly above a parameter | bind that parameter from a root projection or a `pkg.Ident` literal |
+| `// di:use <NodeName>` | line directly above a parameter | bind that parameter to the specific provider node named `NodeName` (consumer-side selection; mutually exclusive with `// di:param`) |
 | `// di:expose` | constructor func doc | include this node in `Exposed() []any` |
 
 ## Wiring rules, by example
@@ -388,9 +389,48 @@ func New( /* ... */ ) *DB { ... }   // -> c.ReplicaDB
 > **Note:** `name=` only sets the *node/field name*. It is **not** a
 > consumer-side selector. If two providers produce the *same type* and a
 > parameter is resolved *by type*, that is reported as an ambiguity error —
-> resolve it by giving the producers distinct types, or by projecting the
-> value from a root with `// di:param`. (Per-parameter provider selection is
-> a planned future addition.)
+> resolve it by giving the producers distinct types, projecting the value from
+> a root with `// di:param`, or selecting a specific provider with
+> `// di:use <NodeName>`.
+
+### 7. Consumer-side selection with `// di:use`
+
+When multiple providers produce a type that satisfies one parameter, by-type
+resolution is ambiguous and `easydi` will report an error. `// di:use <NodeName>`
+lets a consumer select the specific provider node to wire, by its node name
+(the `di:provide name=` value, or the function name when `name=` is omitted).
+
+```go
+// di:provide name=TwitchHTTP
+func NewTwitchHTTP() *http.Client { /* ... */ }
+
+// di:provide name=HandlersAuth
+func NewAuthHTTP() *http.Client { /* ... */ }
+
+// di:provide
+func NewTwitchAPI(
+    // di:use TwitchHTTP
+    client *http.Client,
+) *TwitchAPI { return &TwitchAPI{c: client} }
+
+// di:provide
+func NewAuthService(
+    // di:use HandlersAuth
+    client *http.Client,
+) *AuthService { return &AuthService{c: client} }
+```
+
+Rules:
+
+- `// di:use` must appear on its **own line directly above** the parameter it
+  annotates (same placement as `// di:param`).
+- The named node must exist; its produced type must be assignable to the
+  parameter under the same strict rules as by-type resolution (identical
+  concrete types, or an interface the produced type implements; pointers ≠
+  values).
+- `// di:param` and `// di:use` on the same parameter is an error.
+- The selected edge participates in topological ordering and cycle detection
+  like any other dependency.
 
 ## Lifecycle: Start and Close
 
@@ -489,6 +529,21 @@ Generated imports are path-sorted (not `goimports`-grouped into std /
 third-party blocks); the file is otherwise `gofmt`-formatted and compiles as
 plain Go.
 
+### Import aliasing
+
+When the scanned packages require imports, `easydi` assigns each import a
+collision-safe, deterministic identifier:
+
+- If the package's base name is unique across all imports **and** is a valid
+  Go identifier that is not a keyword, it is kept bare (e.g. `app`, `http`).
+- Otherwise a minimal-unique-suffix lowerCamelCase alias is derived from the
+  import path (e.g. two packages both named `http` might become `twitchHttp`
+  and `handlersAuth`; a package named `type` gets an alias because it is a
+  keyword).
+
+The aliasing algorithm is deterministic — the same graph always produces the
+same alias assignments — and the output is `gofmt`-stable.
+
 ## Errors
 
 `easydi` fails generation with actionable messages, for example:
@@ -512,10 +567,6 @@ plain Go.
   same Go module.
 - `-pkg` is required; `-o` defaults to `./easydi_gen.go`.
 
-## Limitations (v0.2.0)
+## Limitations (v0.3.0)
 
-- No per-parameter provider selection when multiple providers share a type
-  (see the `name=` note above).
-- Import-alias collisions across same-named packages are not yet
-  deduplicated by the emitter.
 - `di:param` literals are limited to `pkg.Ident` (no calls/expressions).
