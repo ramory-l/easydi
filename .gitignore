@@ -33,3 +33,6 @@ go.work.sum
 
 # Internal specs/plans — kept in-repo, not committed
 docs/superpowers/
+
+# Brainstorming visual companion scratch dir
+.superpowers/
