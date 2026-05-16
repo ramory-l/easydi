@@ -214,8 +214,3 @@ func Generate(g *resolver.Graph, order []*resolver.Node, pkgName string) ([]byte
 	}
 	return formatted, nil
 }
-
-// unaliasDeep is a temporary identity shim; Task 3 will replace this with a
-// real implementation in unalias.go that unwraps named types defined in
-// aliased packages so that types.TypeString produces correct qualified names.
-func unaliasDeep(t types.Type) types.Type { return t }

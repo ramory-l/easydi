@@ -84,6 +84,41 @@ func TestGenerateEmitsLifecycle(t *testing.T) {
 	}
 }
 
+func TestGenerateAliasRootEmitsRHSNoSelfImport(t *testing.T) {
+	pkgs, err := loader.Load("../testdata/aliasroot/...")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res, err := scanner.Scan(pkgs)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	g, err := resolver.Resolve(res)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	order, err := topo.Sort(g)
+	if err != nil {
+		t.Fatalf("sort: %v", err)
+	}
+	out, err := Generate(g, order, "di")
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	s := string(out)
+	// Must NOT import its own output package (the aliasroot/di package path).
+	if strings.Contains(s, `testdata/aliasroot/di"`) {
+		t.Fatalf("generated file imports its own package (self-import):\n%s", s)
+	}
+	// Build must take the alias RHS *cfg.Config, not the alias name di.Config.
+	if !strings.Contains(s, "func Build(config *cfg.Config)") {
+		t.Fatalf("Build must take the alias RHS *cfg.Config, got:\n%s", s)
+	}
+	if _, ferr := format.Source(out); ferr != nil {
+		t.Fatalf("generated source invalid: %v\n%s", ferr, s)
+	}
+}
+
 func TestGenerateDedupesCollidingImports(t *testing.T) {
 	pkgs, err := loader.Load("../testdata/collide/...")
 	if err != nil {
