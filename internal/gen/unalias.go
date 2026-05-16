@@ -8,6 +8,11 @@ import "go/types"
 // as `type Config = *cfg.Config` (declared in the generated package) as its
 // right-hand side `*cfg.Config`, so the generated file never qualifies — and
 // thus never imports — its own output package.
+//
+// Limitation: alias type arguments embedded inside a generic instantiation
+// (a *types.Named with TypeArgs, e.g. a root `*Wrapper[di.Config]`) are not
+// descended into and remain aliased. Generic roots are out of scope for
+// v0.3.0; revisit if/when generics support lands.
 func unaliasDeep(t types.Type) types.Type {
 	if t == nil {
 		return nil
